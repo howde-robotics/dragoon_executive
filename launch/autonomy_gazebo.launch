@@ -1,8 +1,0 @@
-<launch>
-	<include file="$(find dragoon_simulation)/launch/gazebo.launch">
-		<param name="prop_gain" value="1.0" type="double"/>
-		<param name="der_gain" value="10.0" type="double"/>
-		<param name="int_gain" value="0.0" type="double"/>
-	</include>
-	
-</launch>
