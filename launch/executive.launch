@@ -1,0 +1,3 @@
+<launch>
+	<node name="executive" pkg="dragoon_executive" type="executive" output="screen"/>
+</launch>
