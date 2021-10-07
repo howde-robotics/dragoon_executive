@@ -9,7 +9,10 @@ BehavioralExecutive::BehavioralExecutive() : privateNodeHandle_("~")
 void
 BehavioralExecutive::run()
 {
-	ROS_INFO("help");
+	/* Stores the old state before running the current one */
+	oldState = currentState;
+
+	/* Run whatever state we're in */
 	switch (currentState)
 	{
 	case IDLE_STATE:
@@ -33,16 +36,24 @@ BehavioralExecutive::run()
 		break;
 	
 	default:
-		ROS_WARN("Invalid State!");
+		ROS_ERROR("Invalid State!");
 		break;
 	}
 
+	/* Only publish the state when it changes */
+	if (oldState != currentState)
+	{	
+		stateMsg.data = currentState;
+		statePub_.publish(stateMsg);
+	}
 }
 
 void
 BehavioralExecutive::runIdle()
 {
-	ROS_INFO("State: IDLE");
+	std::cout << "\rCurrent State: Idle" << std::flush;
+	/* Reset events */
+	resetEvents(STOP);
 
 	/* Transition to Explore state */
 	if (not eventDict[USER_CONTROL] and eventDict[START]) currentState = EXPLORE_STATE;
@@ -53,7 +64,9 @@ BehavioralExecutive::runIdle()
 void
 BehavioralExecutive::runExplore()
 {
-	ROS_INFO("State: EXPLORE");
+	std::cout << "\rCurrent State: Explore "<< std::flush;
+	/* Reset events */
+	resetEvents({START, HUMAN_REACHED, NO_HUMAN});
 
 	/* Transition stationary sweep */
 	if (eventDict[GOAL_REACHED]) currentState = SWEEP_STATE;
@@ -66,7 +79,9 @@ BehavioralExecutive::runExplore()
 void 
 BehavioralExecutive::runInput()
 {
-	ROS_INFO("State: INPUT");
+	std::cout << "\rCurrent State: User Input" << std::flush;
+	/* Reset events. Note that we do not reset the 'USER_CONTROL' state. This needs to be set manually*/
+	resetEvents({START, HUMAN_REACHED, NO_HUMAN});
 
 	/* Transition stationary sweep */
 	if (eventDict[GOAL_REACHED]) currentState = SWEEP_STATE;
@@ -74,30 +89,38 @@ BehavioralExecutive::runInput()
 	if (eventDict[NEW_HUMAN]) currentState = APPROACH_STATE;
 	 /* Transition to IDLE */
 	if (eventDict[STOP]) currentState = IDLE_STATE;
-
 }
 
 void 
 BehavioralExecutive::runApproach()
 {
-	ROS_INFO("State: APPROACH");
+	std::cout << "\rCurrent State: Approach" << std::flush;
+	/* Reset events */
+	resetEvents(NEW_HUMAN);
 
 	 /* Transition to explore */
-	if (eventDict[GOAL_REACHED] and not eventDict[USER_CONTROL]) currentState = INPUT_STATE;
+	if (eventDict[HUMAN_REACHED] and not eventDict[USER_CONTROL]) currentState = EXPLORE_STATE;
 	 /* Transition to user input */
-	if (eventDict[GOAL_REACHED] and eventDict[USER_CONTROL]) currentState = INPUT_STATE;
-
+	if (eventDict[HUMAN_REACHED] and eventDict[USER_CONTROL]) currentState = INPUT_STATE;
+	/* Transition to Idle */
+	if (eventDict[STOP]) currentState = IDLE_STATE;
 }
 
 void
 BehavioralExecutive::runSweep()
 {
-	ROS_INFO("State: SWEEP");
+	std::cout << "\rCurrent State: Sweep  " << std::flush;
+	/* Reset events */
+	resetEvents(GOAL_REACHED);
 
 	/* Transition to Explore */
 	if (eventDict[NO_HUMAN] and not eventDict[USER_CONTROL]) currentState = EXPLORE_STATE;
 	 /* Transition to input */
 	if (eventDict[NO_HUMAN] and eventDict[USER_CONTROL]) currentState = INPUT_STATE;	
+	/* Transition to Approach human */
+	if (eventDict[NEW_HUMAN]) currentState = APPROACH_STATE;
+	/* Transition to Idle */
+	if (eventDict[STOP]) currentState = IDLE_STATE;
 }
 
 void
@@ -107,18 +130,26 @@ BehavioralExecutive::humanDetectionCallback()
 }
 
 void 
-BehavioralExecutive::commandsCallback()
+BehavioralExecutive::commandsCallback(const dragoon_messages::stateCmdConstPtr stateCmd)
 {
-
+	std::string event = stateCmd->event;
+	bool value = stateCmd->value;
+	 /* Set the event correctly */
+	eventDict[event] = value;
+	std::cout << std::endl;
+	ROS_INFO_STREAM("Received event: " << event << ". Set to: " << value);
 }
 
 void
 BehavioralExecutive::initRos()
 {
 	// humanDetectionsSub_ = nodeHandle_.subscribe("");
+	commandsSub_ = nodeHandle_.subscribe("commands", 1, &BehavioralExecutive::commandsCallback, this);
 	// run the node at specific frequency
 	privateNodeHandle_.param<double>("timer_freq_", timer_freq_, 10);
 	timer_ = nodeHandle_.createTimer(ros::Rate(timer_freq_), &BehavioralExecutive::timerCallback, this);
+	/* Publishers */
+	statePub_ = nodeHandle_.advertise<std_msgs::Int32>("/behavior_state", 1);
 }
 
 void
