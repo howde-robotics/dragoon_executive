@@ -1,6 +1,6 @@
 #include "executive.h"
 
-BehavioralExecutive::BehavioralExecutive() : privateNodeHandle_("~")
+BehavioralExecutive::BehavioralExecutive() : privateNodeHandle_("~"), moveBaseClient_("move_base_from_executive")
 {
 	this->initRos();
 
@@ -68,6 +68,8 @@ BehavioralExecutive::runExplore()
 	/* Reset events */
 	resetEvents({START, HUMAN_REACHED, NO_HUMAN});
 
+	/* Runtime of this function actually occurs in the explore package */
+
 	/* Transition stationary sweep */
 	if (eventDict[GOAL_REACHED]) currentState = SWEEP_STATE;
 	/* Transition to Approach human */
@@ -98,7 +100,7 @@ BehavioralExecutive::runApproach()
 	/* Reset events */
 	resetEvents(NEW_HUMAN);
 
-	 /* Transition to explore */
+	/* Transition to explore */
 	if (eventDict[HUMAN_REACHED] and not eventDict[USER_CONTROL]) currentState = EXPLORE_STATE;
 	 /* Transition to user input */
 	if (eventDict[HUMAN_REACHED] and eventDict[USER_CONTROL]) currentState = INPUT_STATE;
@@ -126,6 +128,31 @@ BehavioralExecutive::runSweep()
 void
 BehavioralExecutive::humanDetectionCallback()
 {
+	/* This needs to subscribe to a human detection and then calculate the path to the human */
+	eventDict[NEW_HUMAN] = true;
+	/* Extract human pose and set the member variable */
+	// humanPose.header.frame_id = 
+	// humanPose.pose.position = 
+	// humanPose.pose.orientation = 
+
+}
+
+void
+BehavioralExecutive::approachDoneCallback()
+{
+
+}
+
+void
+BehavioralExecutive::approachActiveCallback()
+{
+	/* Set the current dragoon distance position */
+
+}
+
+void
+BehavioralExecutive::approachFeedbackCallback()
+{
 
 }
 
@@ -143,8 +170,11 @@ BehavioralExecutive::commandsCallback(const dragoon_messages::stateCmdConstPtr s
 void
 BehavioralExecutive::initRos()
 {
-	// humanDetectionsSub_ = nodeHandle_.subscribe("");
+	/* TODO: Fill in the human detection */
+	// humanDetectionsSub_ = nodeHandle_.subscribe("/world_state", 1, &BehavioralExecutive::humanDetectionCallback, this);
 	commandsSub_ = nodeHandle_.subscribe("commands", 1, &BehavioralExecutive::commandsCallback, this);
+	/* TODO: subscirbe to the current pose from TF or something */
+	// poseSub_ = nodeHandle_.subscribe("")
 	// run the node at specific frequency
 	privateNodeHandle_.param<double>("timer_freq_", timer_freq_, 10);
 	timer_ = nodeHandle_.createTimer(ros::Rate(timer_freq_), &BehavioralExecutive::timerCallback, this);
