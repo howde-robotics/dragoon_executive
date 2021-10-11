@@ -1,6 +1,6 @@
 #include "executive.h"
 
-BehavioralExecutive::BehavioralExecutive() : privateNodeHandle_("~"), moveBaseClient_("move_base_from_executive")
+BehavioralExecutive::BehavioralExecutive() : privateNodeHandle_("~"), moveBaseClient_("move_base_from_executive", false)
 {
 	this->initRos();
 
@@ -98,7 +98,7 @@ BehavioralExecutive::runApproach()
 {
 	std::cout << "\rCurrent State: Approach" << std::flush;
 	/* Reset events */
-	resetEvents(NEW_HUMAN);
+	resetEvents({NEW_HUMAN, GOAL_REACHED});
 
 	/* Transition to explore */
 	if (eventDict[HUMAN_REACHED] and not eventDict[USER_CONTROL]) currentState = EXPLORE_STATE;
@@ -113,7 +113,7 @@ BehavioralExecutive::runSweep()
 {
 	std::cout << "\rCurrent State: Sweep  " << std::flush;
 	/* Reset events */
-	resetEvents(GOAL_REACHED);
+	resetEvents({GOAL_REACHED, HUMAN_REACHED});
 
 	/* Transition to Explore */
 	if (eventDict[NO_HUMAN] and not eventDict[USER_CONTROL]) currentState = EXPLORE_STATE;
@@ -125,16 +125,66 @@ BehavioralExecutive::runSweep()
 	if (eventDict[STOP]) currentState = IDLE_STATE;
 }
 
-void
-BehavioralExecutive::humanDetectionCallback()
-{
-	/* This needs to subscribe to a human detection and then calculate the path to the human */
-	eventDict[NEW_HUMAN] = true;
-	/* Extract human pose and set the member variable */
-	// humanPose.header.frame_id = 
-	// humanPose.pose.position = 
-	// humanPose.pose.orientation = 
+namespace {
 
+static const pbl::Gaussian* getBestGaussian(const pbl::PDF& pdf, double min_weight) {
+	if (pdf.type() == pbl::PDF::GAUSSIAN) {
+		return pbl::PDFtoGaussian(pdf);
+	} else if (pdf.type() == pbl::PDF::MIXTURE) {
+		const pbl::Mixture* mix = pbl::PDFtoMixture(pdf);
+
+		if (mix){
+			const pbl::Gaussian* G_best = NULL;
+			double w_best = min_weight;
+			for(int i = 0; i < mix->components(); ++i) {
+				const pbl::PDF& pdf = mix->getComponent(i);
+				const pbl::Gaussian* G = pbl::PDFtoGaussian(pdf);
+				double w = mix->getWeight(i);
+				if (G && w > w_best) {
+					G_best = G;
+					w_best = w;
+				}
+			}
+			return G_best;
+		}
+	}
+
+	return NULL;
+}
+
+}
+
+void
+BehavioralExecutive::humanDetectionCallback(const wire_msgs::WorldState::ConstPtr& msg)
+{
+	for (const wire_msgs::ObjectState& obj : msg->objects) {
+
+		// Create marker
+		for (auto prop : obj.properties)
+		{
+			if (prop.attribute == "position")
+			{
+				pbl::PDF* pdf = pbl::msgToPDF(prop.pdf);
+				const pbl::Gaussian* gauss = getBestGaussian(*pdf, 0);
+				if (gauss) {
+					const pbl::Vector& mean = gauss->getMean();
+					humanPose_.header.stamp = msg->header.stamp;
+					humanPose_.header.frame_id = "map";
+					humanPose_.pose.position.x = mean(0);
+					humanPose_.pose.position.y = mean(1);
+					humanPose_.pose.position.z = mean(2);
+					humanPose_.pose.orientation.w = 1.0;
+				}
+			}
+		}
+		// this ID is not in the human ID set yet
+		if (humanIds_.find(obj.ID) == humanIds_.end())
+		{
+			eventDict[NEW_HUMAN] = true;
+			humanIds_.insert(obj.ID);
+		}
+	}
+	/* This needs to subscribe to a human detection and then calculate the path to the human */
 }
 
 void
@@ -171,7 +221,7 @@ void
 BehavioralExecutive::initRos()
 {
 	/* TODO: Fill in the human detection */
-	// humanDetectionsSub_ = nodeHandle_.subscribe("/world_state", 1, &BehavioralExecutive::humanDetectionCallback, this);
+	humanDetectionsSub_ = nodeHandle_.subscribe("/world_state", 1, &BehavioralExecutive::humanDetectionCallback, this);
 	commandsSub_ = nodeHandle_.subscribe("commands", 1, &BehavioralExecutive::commandsCallback, this);
 	/* TODO: subscirbe to the current pose from TF or something */
 	// poseSub_ = nodeHandle_.subscribe("")

@@ -1,4 +1,4 @@
-find_package(GTest REQUIRED)
+# find_package(GTest REQUIRED)
 
 # the planning library
 add_library(planning 
@@ -35,10 +35,10 @@ set(TESTS
 	test_constraint
 )
 # use this forloop to create all the tests
-foreach(TEST ${TESTS})
-	# add the executable
-	catkin_add_gtest(${TEST} tests/${TEST})
-	# link the libraries
-	target_link_libraries(${TEST} ${TESTING_LIBS})
+# foreach(TEST ${TESTS})
+# 	# add the executable
+# 	catkin_add_gtest(${TEST} tests/${TEST})
+# 	# link the libraries
+# 	target_link_libraries(${TEST} ${TESTING_LIBS})
 
-endforeach()
+# endforeach()

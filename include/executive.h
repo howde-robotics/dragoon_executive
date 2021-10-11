@@ -1,3 +1,4 @@
+#include <unordered_set>
 #include <ros/ros.h>
 #include <iostream>
 #include "states.h"
@@ -5,9 +6,13 @@
 #include <std_msgs/Int32.h>
 #include <actionlib/server/simple_action_server.h>
 #include <geometry_msgs/PoseStamped.h>
+#include <geometry_msgs/Point.h>
 #include <move_base_msgs/MoveBaseAction.h>
-// #include "wire_msgs/WorldEvidence.h"
-// #include "wire_msgs/WorldState"
+
+// wire stuff
+#include "wire_msgs/WorldEvidence.h"
+#include "wire_msgs/WorldState.h"
+#include "problib/conversions.h"
 
 class BehavioralExecutive {
 	double timer_freq_;
@@ -23,6 +28,7 @@ class BehavioralExecutive {
 	ros::Subscriber humanDetectionsSub_, commandsSub_, poseSub_;
 	ros::Publisher commandsPub_, statePub_;
 	ros::Timer timer_;
+	std::unordered_set<int> humanIds_;
 
 	void initRos();
 	void run();
@@ -32,7 +38,7 @@ class BehavioralExecutive {
 	void runApproach();
 	void runSweep();
 	void timerCallback(const ros::TimerEvent &e);
-	void humanDetectionCallback();
+	void humanDetectionCallback(const wire_msgs::WorldState::ConstPtr& msg);
 	void commandsCallback(const dragoon_messages::stateCmdConstPtr stateCmd);
 	void approachActiveCallback();
 	void approachFeedbackCallback();

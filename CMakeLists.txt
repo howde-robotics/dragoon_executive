@@ -14,6 +14,7 @@ rostest
 rosunit
 actionlib_msgs
 dragoon_messages
+problib
 )
 
 catkin_package(CATKIN_DEPENDS
@@ -31,6 +32,7 @@ add_subdirectory(planning)
 include_directories(
   ${catkin_INCLUDE_DIRS}
   include
+  ${dragoon_messages_SOURCE_DIR}/include
 )
 
 # add executables from your source code, i.e. compile it
