@@ -39,3 +39,4 @@ include_directories(
 # .py code are not included here as they do not need to be compiled
 add_executable(executive src/executive/executive)
 target_link_libraries(executive ${catkin_LIBRARIES})
+add_dependencies(executive dragoon_messages_generate_messages_cpp)
