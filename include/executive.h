@@ -8,6 +8,8 @@
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/Point.h>
 #include <move_base_msgs/MoveBaseAction.h>
+#include <sensor_msgs/Imu.h>
+#include <geometry_msgs/Twist.h>
 
 // wire stuff
 #include "wire_msgs/WorldEvidence.h"
@@ -29,6 +31,16 @@ class BehavioralExecutive {
 	ros::Publisher commandsPub_, statePub_;
 	ros::Timer timer_;
 	std::unordered_set<int> humanIds_;
+
+	// Sweep related
+	ros::Subscriber imuSub_, moveBaseCmdVelSub_;
+	ros::Publisher outCmdVelPub_;
+	double sweepSpeed_;	// rad/s
+	double sweepDegTurned_ = 0.0;
+	ros::Time lastImuTime_;
+	geometry_msgs::Twist currMoveBaseCmdVel_;
+	void imuCallback(const sensor_msgs::Imu::ConstPtr& msg);
+	void moveBaseCmdVelCallback(const geometry_msgs::Twist::ConstPtr& msg);
 
 	void initRos();
 	void run();

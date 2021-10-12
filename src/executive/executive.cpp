@@ -70,8 +70,15 @@ BehavioralExecutive::runExplore()
 
 	/* Runtime of this function actually occurs in the explore package */
 
+	// publish move base cmd vel when running explore
+	outCmdVelPub_.publish(currMoveBaseCmdVel_);
+
 	/* Transition stationary sweep */
-	if (eventDict[GOAL_REACHED]) currentState = SWEEP_STATE;
+	if (eventDict[GOAL_REACHED])
+	{
+		currentState = SWEEP_STATE;
+		sweepDegTurned_ = 0.0;
+	}
 	/* Transition to Approach human */
 	if (eventDict[NEW_HUMAN]) currentState = APPROACH_STATE;
 	 /* Transition to IDLE */
@@ -85,8 +92,15 @@ BehavioralExecutive::runInput()
 	/* Reset events. Note that we do not reset the 'USER_CONTROL' state. This needs to be set manually*/
 	resetEvents({START, HUMAN_REACHED, NO_HUMAN});
 
+	// publish move base cmd vel when running user input
+	outCmdVelPub_.publish(currMoveBaseCmdVel_);
+
 	/* Transition stationary sweep */
-	if (eventDict[GOAL_REACHED]) currentState = SWEEP_STATE;
+	if (eventDict[GOAL_REACHED]) 
+	{
+		currentState = SWEEP_STATE;
+		sweepDegTurned_ = 0.0;
+	}
 	/* Transition to Approach human */
 	if (eventDict[NEW_HUMAN]) currentState = APPROACH_STATE;
 	 /* Transition to IDLE */
@@ -100,6 +114,9 @@ BehavioralExecutive::runApproach()
 	/* Reset events */
 	resetEvents({NEW_HUMAN, GOAL_REACHED});
 
+	// publish move base cmd vel when running appraoch
+	outCmdVelPub_.publish(currMoveBaseCmdVel_);
+
 	/* Transition to explore */
 	if (eventDict[HUMAN_REACHED] and not eventDict[USER_CONTROL]) currentState = EXPLORE_STATE;
 	 /* Transition to user input */
@@ -111,9 +128,21 @@ BehavioralExecutive::runApproach()
 void
 BehavioralExecutive::runSweep()
 {
-	std::cout << "\rCurrent State: Sweep  " << std::flush;
+	std::cout << "\rCurrent State: Sweep  " << sweepDegTurned_ * 180 / M_PI << "deg" << std::flush;
 	/* Reset events */
 	resetEvents({GOAL_REACHED, HUMAN_REACHED});
+
+	geometry_msgs::Twist sweepCmdVel;
+	sweepCmdVel.angular.z = sweepSpeed_;
+
+	// publish sweep cmd vel when running sweep
+	outCmdVelPub_.publish(sweepCmdVel);
+
+	if (sweepDegTurned_ > 2 * M_PI)
+	{
+		sweepDegTurned_ = 0.0;
+		eventDict[NO_HUMAN] = true;
+	}
 
 	/* Transition to Explore */
 	if (eventDict[NO_HUMAN] and not eventDict[USER_CONTROL]) currentState = EXPLORE_STATE;
@@ -217,6 +246,18 @@ BehavioralExecutive::commandsCallback(const dragoon_messages::stateCmdConstPtr s
 	ROS_INFO_STREAM("Received event: " << event << ". Set to: " << value);
 }
 
+void BehavioralExecutive::imuCallback(const sensor_msgs::Imu::ConstPtr& msg)
+{
+	ros::Duration dt = ros::Time::now() - lastImuTime_;
+	sweepDegTurned_ += msg->angular_velocity.z * dt.toSec();
+	lastImuTime_ = ros::Time::now();
+}
+
+void BehavioralExecutive::moveBaseCmdVelCallback(const geometry_msgs::Twist::ConstPtr& msg)
+{
+	currMoveBaseCmdVel_ = *msg;
+}
+
 void
 BehavioralExecutive::initRos()
 {
@@ -226,10 +267,16 @@ BehavioralExecutive::initRos()
 	/* TODO: subscirbe to the current pose from TF or something */
 	// poseSub_ = nodeHandle_.subscribe("")
 	// run the node at specific frequency
-	privateNodeHandle_.param<double>("timer_freq_", timer_freq_, 10);
+	privateNodeHandle_.param<double>("timer_freq_", timer_freq_, 20);
+	privateNodeHandle_.param<double>("sweep_speed", sweepSpeed_, 0.3);
 	timer_ = nodeHandle_.createTimer(ros::Rate(timer_freq_), &BehavioralExecutive::timerCallback, this);
 	/* Publishers */
 	statePub_ = nodeHandle_.advertise<std_msgs::Int32>("/behavior_state", 1);
+
+	// Sweep related
+	imuSub_ = nodeHandle_.subscribe("imu", 1, &BehavioralExecutive::imuCallback, this);
+	moveBaseCmdVelSub_ = nodeHandle_.subscribe("cmd_vel_move_base", 1, &BehavioralExecutive::moveBaseCmdVelCallback, this);
+	outCmdVelPub_ = nodeHandle_.advertise<geometry_msgs::Twist>("/cmd_vel", 1);
 }
 
 void
