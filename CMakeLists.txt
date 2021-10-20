@@ -15,6 +15,7 @@ rosunit
 actionlib_msgs
 dragoon_messages
 problib
+tf2_ros
 )
 
 catkin_package(CATKIN_DEPENDS
@@ -25,6 +26,7 @@ sensor_msgs
 nav_msgs
 tf
 actionlib_msgs
+tf2_ros
 )
 
 add_subdirectory(planning)

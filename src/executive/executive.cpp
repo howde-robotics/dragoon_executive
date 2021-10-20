@@ -1,6 +1,6 @@
 #include "executive.h"
 
-BehavioralExecutive::BehavioralExecutive() : privateNodeHandle_("~"), moveBaseClient_("move_base_from_executive", false)
+BehavioralExecutive::BehavioralExecutive() : privateNodeHandle_("~"), moveBaseClient_("move_base_from_executive", false), tfListener(tfBuffer)
 {
 	this->initRos();
 
@@ -45,6 +45,16 @@ BehavioralExecutive::run()
 	{	
 		stateMsg.data = currentState;
 		statePub_.publish(stateMsg);
+	}
+
+	/* Listen for dragoon's current pose */
+	try {
+		/* TODO: Put in correct things here */
+		dragoonTransform_ = tfBuffer.lookupTransform("map", "base_link", ros::Time(0));
+	}
+	catch (tf2::TransformException& ex){
+		ROS_WARN("%s", ex.what());
+		/* I'd rather not sleep this but the tutorial has one */
 	}
 }
 
@@ -114,20 +124,32 @@ BehavioralExecutive::runApproach()
 	/* Reset events */
 	resetEvents({NEW_HUMAN, GOAL_REACHED});
 
-	/* We need to make sure dragoon is facing towards the last detected person */
-	// outCmdVelPub_.publish(currMoveBaseCmdVel_);
-	// determine angular displacement
+	/**
+	 * We need dragoon to be orientated facing the last detected evidence
+	 * This finds the angular displacement between dragoon and evidence in the correct frame
+	 */
 	double eviX = humanEvidencePose_.pose.position.x;
 	double eviY = humanEvidencePose_.pose.position.y;
+	double dragX = dragoonTransform_.transform.translation.x;
+	double dragY = dragoonTransform_.transform.translation.y;
 	double beta = std::atan2(
 		eviY,
 		eviX
 	);
 
-	/* Listen to dragoon pose and then find different between the two angles */
-	double psi = 0;
+	double psi = std::atan2(
+		dragX,
+		dragY
+	);
+
 	/* The desired angle to close */
 	double alpha = psi - beta;
+	/* Time to reach the desired position */
+	double time = 5.0;
+
+	geometry_msgs::Twist reOrientCmdVel;
+	reOrientCmdVel.angular.z = alpha / time;
+	outCmdVelPub_.publish(reOrientCmdVel);
 
 	/* Transition to explore */
 	if (eventDict[HUMAN_SEEN] and not eventDict[USER_CONTROL]) currentState = EXPLORE_STATE;

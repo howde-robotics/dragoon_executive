@@ -11,6 +11,7 @@
 #include <move_base_msgs/MoveBaseAction.h>
 #include <sensor_msgs/Imu.h>
 #include <geometry_msgs/Twist.h>
+#include <tf2_ros/transform_listener.h>
 
 // wire stuff
 #include "wire_msgs/WorldEvidence.h"
@@ -29,7 +30,10 @@ class BehavioralExecutive {
 	ros::Publisher commandsPub_, statePub_;
 	ros::Timer timer_;
 	/* Detection related */
+	tf2_ros::Buffer tfBuffer;
+	tf2_ros::TransformListener tfListener;
 	geometry_msgs::PoseStamped humanPose_;
+	geometry_msgs::TransformStamped dragoonTransform_;
 	geometry_msgs::PoseStamped humanEvidencePose_;
 	double evidenceThreshold_;
 	std::unordered_map<int, geometry_msgs::PoseStamped> detectedHumans_;
