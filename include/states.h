@@ -3,14 +3,14 @@
 #include <unordered_map>
 
 // dictionary to describe the current events
-const std::string STOP          = "STOP";
-const std::string START         = "START";
-const std::string USER_CONTROL  = "USER CONTROL";
-const std::string NEW_HUMAN     = "NEW HUMAN";
-const std::string OLD_HUMAN     = "OLD HUMAN";
-const std::string NO_HUMAN      = "NO HUMAN";
-const std::string GOAL_REACHED  = "GOAL REACHED";
-const std::string HUMAN_REACHED = "HUMAN REACHED";
+const std::string STOP         = "STOP";
+const std::string START        = "START";
+const std::string USER_CONTROL = "USER CONTROL";
+const std::string NEW_HUMAN    = "NEW HUMAN";
+const std::string OLD_HUMAN    = "OLD HUMAN";
+const std::string NO_HUMAN     = "NO HUMAN";
+const std::string GOAL_REACHED = "GOAL REACHED";
+const std::string HUMAN_SEEN   = "HUMAN SEEN";
 
 std::unordered_map<std::string, bool> eventDict = {
 	{STOP           , false}  ,
@@ -20,7 +20,7 @@ std::unordered_map<std::string, bool> eventDict = {
 	{OLD_HUMAN      , false}  ,
 	{NO_HUMAN       , false}  ,
 	{GOAL_REACHED   , false}  ,
-	{HUMAN_REACHED  , false}  ,
+	{HUMAN_SEEN  , false}  ,
 };
 
 enum State {
