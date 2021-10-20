@@ -47,6 +47,7 @@ class BehavioralExecutive {
 	geometry_msgs::Twist currMoveBaseCmdVel_;
 	void imuCallback(const sensor_msgs::Imu::ConstPtr& msg);
 	void moveBaseCmdVelCallback(const geometry_msgs::Twist::ConstPtr& msg);
+        bool finishedSweepSleep_ = false;
 
 	void initRos();
 	void run();

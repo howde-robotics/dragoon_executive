@@ -1,6 +1,6 @@
 <launch>
     <arg name="timer_freq_" default="20.0" doc="executive timer freq Hz"/>
-    <arg name="sweep_speed" default="0.3" doc="rad per sec sweep speed"/>
+    <arg name="sweep_speed" default="0.4" doc="rad per sec sweep speed"/>
 
 	<node name="executive" pkg="dragoon_executive" type="executive" output="screen">
 	    <param name="timer_freq_" value="$(arg timer_freq_)" type="double"/>

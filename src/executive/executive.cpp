@@ -86,7 +86,8 @@ BehavioralExecutive::runExplore()
 	/* Transition stationary sweep */
 	if (eventDict[GOAL_REACHED])
 	{
-		currentState = SWEEP_STATE;
+		finishedSweepSleep_ = false;
+                currentState = SWEEP_STATE;
 		sweepDegTurned_ = 0.0;
 	}
 	/* Transition to Approach human */
@@ -167,6 +168,16 @@ BehavioralExecutive::runSweep()
 	resetEvents({GOAL_REACHED, HUMAN_SEEN});
 
 	geometry_msgs::Twist sweepCmdVel;
+
+        if (!finishedSweepSleep_)
+        {
+	  ROS_INFO("Decelerating...");
+          sweepCmdVel.angular.x = 0.0;
+          sweepCmdVel.angular.z = 0.0;
+          outCmdVelPub_.publish(sweepCmdVel);
+          ros::Duration(5.0).sleep();
+        }
+
 	sweepCmdVel.angular.z = sweepSpeed_;
 
 	// publish sweep cmd vel when running sweep
@@ -186,6 +197,8 @@ BehavioralExecutive::runSweep()
 	if (eventDict[NEW_HUMAN]) currentState = APPROACH_STATE;
 	/* Transition to Idle */
 	if (eventDict[STOP]) currentState = IDLE_STATE;
+
+        finishedSweepSleep_ = true;
 }
 
 namespace {
