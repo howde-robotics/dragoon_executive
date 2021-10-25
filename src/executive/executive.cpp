@@ -4,6 +4,9 @@ BehavioralExecutive::BehavioralExecutive() : privateNodeHandle_("~"), moveBaseCl
 {
 	this->initRos();
 
+	// To ensure that tfBuffer has a frame to look at even before any detection exist;
+	humanEvidencePose_.header.frame_id = "map";
+	humanEvidencePoseInBaseLink_.header.frame_id = "base_link";
 }
 
 void
@@ -45,16 +48,6 @@ BehavioralExecutive::run()
 	{	
 		stateMsg.data = currentState;
 		statePub_.publish(stateMsg);
-	}
-
-	/* Listen for dragoon's current pose */
-	try {
-		/* TODO: Put in correct things here */
-		dragoonTransform_ = tfBuffer.lookupTransform("map", "base_link", ros::Time(0));
-	}
-	catch (tf2::TransformException& ex){
-		ROS_WARN("%s", ex.what());
-		/* I'd rather not sleep this but the tutorial has one */
 	}
 }
 
@@ -133,24 +126,58 @@ BehavioralExecutive::runApproach()
 	double eviY = humanEvidencePose_.pose.position.y;
 	double dragX = dragoonTransform_.transform.translation.x;
 	double dragY = dragoonTransform_.transform.translation.y;
+
+
+	// try {
+	// 	auto evidenceInBaseLinkFrame = tfBuffer.transform(humanEvidencePose_, "base_link", ros::Time(0));
+	// }
+	// catch (tf2::TransformException& ex){
+	// 	ROS_WARN("%s", ex.what());
+	// }
+
+	/* Listen for dragoon's current pose */
+	try {
+		/* TODO: Put in correct things here */
+		dragoonTransform_ = tfBuffer.lookupTransform("base_link", "map", ros::Time(0));
+	}
+	catch (tf2::TransformException& ex){
+		ROS_WARN("%s", ex.what());
+		/* I'd rather not sleep this but the tutorial has one */
+		return;
+	}
+
+
+	tf2::doTransform(humanEvidencePose_, humanEvidencePoseInBaseLink_, dragoonTransform_);
+
+	humanEvidencePoseInBaseLinkPub_.publish(humanEvidencePoseInBaseLink_);
+
 	double beta = std::atan2(
-		eviY,
-		eviX
+		humanEvidencePoseInBaseLink_.pose.position.y,
+		humanEvidencePoseInBaseLink_.pose.position.x
 	);
 
-	double psi = std::atan2(
-		dragX,
-		dragY
-	);
+	// double psi = std::atan2(
+	// 	dragX,
+	// 	dragY
+	// );
+
+
 
 	/* The desired angle to close */
-	double alpha = psi - beta;
+	double alpha = beta;
 	/* Time to reach the desired position */
 	double time = 5.0;
 
 	geometry_msgs::Twist reOrientCmdVel;
-	reOrientCmdVel.angular.z = alpha / time;
+	reOrientCmdVel.angular.z = alpha / time * 0.75;
+
+
+	ROS_INFO("Decelerating in Approach...");
+	//reOrientCmdVel.angular.x = 0.0;
+	//reOrientCmdVel.angular.z = 0.0;
 	outCmdVelPub_.publish(reOrientCmdVel);
+	ros::Duration(time).sleep();
+	eventDict[HUMAN_SEEN] = true;
 
 	/* Transition to explore */
 	if (eventDict[HUMAN_SEEN] and not eventDict[USER_CONTROL]) currentState = EXPLORE_STATE;
@@ -171,11 +198,11 @@ BehavioralExecutive::runSweep()
 
         if (!finishedSweepSleep_)
         {
-	  ROS_INFO("Decelerating...");
-          sweepCmdVel.angular.x = 0.0;
-          sweepCmdVel.angular.z = 0.0;
-          outCmdVelPub_.publish(sweepCmdVel);
-          ros::Duration(5.0).sleep();
+	  		ROS_INFO("Decelerating to Sweep...");
+        	sweepCmdVel.angular.x = 0.0;
+        	sweepCmdVel.angular.z = 0.0;
+        	outCmdVelPub_.publish(sweepCmdVel);
+        	ros::Duration(5.0).sleep();
         }
 
 	sweepCmdVel.angular.z = sweepSpeed_;
@@ -233,6 +260,7 @@ static const pbl::Gaussian* getBestGaussian(const pbl::PDF& pdf, double min_weig
 void
 BehavioralExecutive::humanDetectionCallback(const wire_msgs::WorldState::ConstPtr& msg)
 {
+	detectedHumans_.clear();
 	for (const wire_msgs::ObjectState& obj : msg->objects) {
 
 		// Create marker
@@ -253,13 +281,16 @@ BehavioralExecutive::humanDetectionCallback(const wire_msgs::WorldState::ConstPt
 				}
 			}
 		}
-		// this ID is not in the human ID map yet
-		if (detectedHumans_.find(obj.ID) == detectedHumans_.end())
-		{
-			eventDict[HUMAN_SEEN] = true;
-			/* Place the detected human in the map */
-			detectedHumans_[obj.ID] = humanPose_;
-		}
+		detectedHumans_[obj.ID] = humanPose_;
+
+
+		// // this ID is not in the human ID map yet
+		// if (detectedHumans_.find(obj.ID) == detectedHumans_.end())
+		// {
+		// 	// eventDict[HUMAN_SEEN] = true;
+		// 	/* Place the detected human in the map */
+		// 	detectedHumans_[obj.ID] = humanPose_;
+		// }
 	}
 }
 
@@ -272,6 +303,8 @@ BehavioralExecutive::humanEvidenceCallback(const wire_msgs::WorldEvidence::Const
 	
 	/* Extract message information for evidence location */
 	int id = 0;
+
+	// bool noNewHuman = true;
 	for (const wire_msgs::ObjectEvidence& objectEvidence : msg->object_evidence){
 
 		/* Store the most recent evidence position */
@@ -294,8 +327,17 @@ BehavioralExecutive::humanEvidenceCallback(const wire_msgs::WorldEvidence::Const
 		}
 
 		/* To prevent evidence from the same human from constantly switching state back */
-		if (not evidenceClose(humanEvidencePose_)) eventDict[NEW_HUMAN] = true;
+		if (not evidenceClose(humanEvidencePose_)) 
+		{
+			eventDict[NEW_HUMAN] = true;
+			// noNewHuman = false;
+			// break;
+		}
 	}
+	// if (noNewHuman)
+	// {
+	// 	eventDict[HUMAN_SEEN] = true;
+	// }
 }
 
 bool 
@@ -355,14 +397,15 @@ void
 BehavioralExecutive::initRos()
 {
 	/* TODO: Fill in the human detection */
-	humanDetectionsSub_ = nodeHandle_.subscribe("/world_state", 1, &BehavioralExecutive::humanDetectionCallback, this);
+	humanStatesSub_ = nodeHandle_.subscribe("/world_state", 1, &BehavioralExecutive::humanDetectionCallback, this);
+	humanEvidencesSub_ = nodeHandle_.subscribe("/world_evidence", 1, &BehavioralExecutive::humanEvidenceCallback, this);
 	commandsSub_ = nodeHandle_.subscribe("commands", 1, &BehavioralExecutive::commandsCallback, this);
 	/* TODO: subscirbe to the current pose from TF or something */
 	// poseSub_ = nodeHandle_.subscribe("")
 	// run the node at specific frequency
 	privateNodeHandle_.param<double>("timer_freq_", timer_freq_, 20);
 	privateNodeHandle_.param<double>("sweep_speed", sweepSpeed_, 0.3);
-	privateNodeHandle_.param<double>("evidence_threshold", evidenceThreshold_, 0.8);
+	privateNodeHandle_.param<double>("evidence_threshold", evidenceThreshold_, 1.0);
 	timer_ = nodeHandle_.createTimer(ros::Rate(timer_freq_), &BehavioralExecutive::timerCallback, this);
 	/* Publishers */
 	statePub_ = nodeHandle_.advertise<std_msgs::Int32>("/behavior_state", 1);
@@ -371,6 +414,7 @@ BehavioralExecutive::initRos()
 	imuSub_ = nodeHandle_.subscribe("imu", 1, &BehavioralExecutive::imuCallback, this);
 	moveBaseCmdVelSub_ = nodeHandle_.subscribe("cmd_vel_move_base", 1, &BehavioralExecutive::moveBaseCmdVelCallback, this);
 	outCmdVelPub_ = nodeHandle_.advertise<geometry_msgs::Twist>("/cmd_vel", 1);
+	humanEvidencePoseInBaseLinkPub_ = nodeHandle_.advertise<geometry_msgs::PoseStamped>("/humanEvidencePoseInBaseLink", 1);
 }
 
 void
