@@ -1,9 +1,19 @@
 <launch>
     <arg name="timer_freq_" default="20.0" doc="executive timer freq Hz"/>
-    <arg name="sweep_speed" default="0.4" doc="rad per sec sweep speed"/>
+    <arg name="sweep_speed" default="0.3" doc="rad per sec sweep speed"/>
+    <arg name="evidence_threshold" default="1.0" doc="evidence closer than this dist to a confirmed human is not a new human"/>
+    <arg name="sweep_deg_target" default="6.0" doc="rad to turn during sweep"/>
+    <arg name="time_aligning_limit" default="5.0" doc="secs allowable to align robot to new human"/>
+    <arg name="aligning_closeness_threshold" default="0.2" doc="how close in radian does robot need to be when aligning"/>
+    <arg name="aligning_p_gain" default="0.5" doc="P gain for reorient cmd vel"/>
 
 	<node name="executive" pkg="dragoon_executive" type="executive" output="screen">
 	    <param name="timer_freq_" value="$(arg timer_freq_)" type="double"/>
         <param name="sweep_speed" value="$(arg sweep_speed)" type ="double"/>
+        <param name="evidence_threshold" value="$(arg evidence_threshold)" type ="double"/>
+        <param name="sweep_deg_target" value="$(arg sweep_deg_target)" type ="double"/>
+        <param name="time_aligning_limit" value="$(arg time_aligning_limit)" type ="double"/>
+        <param name="aligning_closeness_threshold" value="$(arg aligning_closeness_threshold)" type ="double"/>
+        <param name="aligning_p_gain" value="$(arg aligning_p_gain)" type ="double"/>
     </node>
 </launch>

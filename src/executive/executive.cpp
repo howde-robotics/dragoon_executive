@@ -54,7 +54,9 @@ BehavioralExecutive::run()
 void
 BehavioralExecutive::runIdle()
 {
-	std::cout << "\rCurrent State: Idle" << std::flush;
+	// std::cout << "\rCurrent State: Idle" << std::flush;
+    behaviorStateTextMsg_.data = "Idle";
+    stateTextPub_.publish(behaviorStateTextMsg_);
 	/* Reset events */
 	resetEvents(STOP);
 
@@ -67,7 +69,9 @@ BehavioralExecutive::runIdle()
 void
 BehavioralExecutive::runExplore()
 {
-	std::cout << "\rCurrent State: Explore "<< std::flush;
+	// std::cout << "\rCurrent State: Explore "<< std::flush;
+    behaviorStateTextMsg_.data = "Explore";
+    stateTextPub_.publish(behaviorStateTextMsg_);
 	/* Reset events */
 	resetEvents({START, HUMAN_SEEN, NO_HUMAN});
 
@@ -92,7 +96,9 @@ BehavioralExecutive::runExplore()
 void 
 BehavioralExecutive::runInput()
 {
-	std::cout << "\rCurrent State: User Input" << std::flush;
+	// std::cout << "\rCurrent State: User Input" << std::flush;
+    behaviorStateTextMsg_.data = "User Input";
+    stateTextPub_.publish(behaviorStateTextMsg_);
 	/* Reset events. Note that we do not reset the 'USER_CONTROL' state. This needs to be set manually*/
 	resetEvents({START, HUMAN_SEEN, NO_HUMAN});
 
@@ -114,73 +120,84 @@ BehavioralExecutive::runInput()
 void 
 BehavioralExecutive::runApproach()
 {
-	std::cout << "\rCurrent State: Approach, human seen deg away" << std::flush;
+	// std::cout << "\rCurrent State: Approach, human seen deg away" << std::flush;
+    behaviorStateTextMsg_.data = "Approach";
+    stateTextPub_.publish(behaviorStateTextMsg_);
 	/* Reset events */
 	resetEvents({NEW_HUMAN, GOAL_REACHED});
 
-	/**
-	 * We need dragoon to be orientated facing the last detected evidence
-	 * This finds the angular displacement between dragoon and evidence in the correct frame
-	 */
-	double eviX = humanEvidencePose_.pose.position.x;
-	double eviY = humanEvidencePose_.pose.position.y;
-	double dragX = dragoonTransform_.transform.translation.x;
-	double dragY = dragoonTransform_.transform.translation.y;
+    // Lock on to the discovered human evidence so that this pose is not further updated
+    const geometry_msgs::PoseStamped humanEvidencePoseLocked = humanEvidencePose_;
 
+	geometry_msgs::Twist StopCmdVel;
+    behaviorStateTextMsg_.data = "Decelerating in Approach";
+    stateTextPub_.publish(behaviorStateTextMsg_);
+	StopCmdVel.angular.x = 0.0;
+	StopCmdVel.angular.z = 0.0;
+	outCmdVelPub_.publish(StopCmdVel);
+	ros::Duration(4.0).sleep();
 
-	// try {
-	// 	auto evidenceInBaseLinkFrame = tfBuffer.transform(humanEvidencePose_, "base_link", ros::Time(0));
-	// }
-	// catch (tf2::TransformException& ex){
-	// 	ROS_WARN("%s", ex.what());
-	// }
+    // Trying to align
+    behaviorStateTextMsg_.data = "Aligning to detected human";
+    stateTextPub_.publish(behaviorStateTextMsg_);
+    ros::Time startApproachAlignmentTime = ros::Time::now();
+    while (true)
+    {
+        // Cannot spend more than timeAligningLimit on this task
+        ros::Duration timeSpentAligning = ros::Time::now() - startApproachAlignmentTime;
+        if (timeSpentAligning.toSec() > timeAligningLimit_)
+        {
+            break;
+        }
 
-	/* Listen for dragoon's current pose */
-	try {
-		/* TODO: Put in correct things here */
-		dragoonTransform_ = tfBuffer.lookupTransform("base_link", "map", ros::Time(0));
-	}
-	catch (tf2::TransformException& ex){
-		ROS_WARN("%s", ex.what());
-		/* I'd rather not sleep this but the tutorial has one */
-		return;
-	}
+        /* Listen for dragoon's current pose */
+        try {
+            /* TODO: Put in correct things here */
+            dragoonTransform_ = tfBuffer.lookupTransform("base_link", "map", ros::Time(0));
+        }
+        catch (tf2::TransformException& ex){
+            ROS_WARN("%s", ex.what());
+            return;
+        }
 
+        tf2::doTransform(humanEvidencePoseLocked, humanEvidencePoseInBaseLink_, dragoonTransform_);
 
-	tf2::doTransform(humanEvidencePose_, humanEvidencePoseInBaseLink_, dragoonTransform_);
+        humanEvidencePoseInBaseLinkPub_.publish(humanEvidencePoseInBaseLink_);
 
-	humanEvidencePoseInBaseLinkPub_.publish(humanEvidencePoseInBaseLink_);
+        double beta = std::atan2(
+            humanEvidencePoseInBaseLink_.pose.position.y,
+            humanEvidencePoseInBaseLink_.pose.position.x
+        );
 
-	double beta = std::atan2(
-		humanEvidencePoseInBaseLink_.pose.position.y,
-		humanEvidencePoseInBaseLink_.pose.position.x
-	);
+        // if dragoon orientation is close enough to human, stop
+        if (std::fabs(beta) < reOrientClosenessThreshold_)
+        {
+            break;
+        }
 
-	// double psi = std::atan2(
-	// 	dragX,
-	// 	dragY
-	// );
+        geometry_msgs::Twist reOrientCmdVel;
+        reOrientCmdVel.angular.z = beta * reOrientPGain_;
+	    outCmdVelPub_.publish(reOrientCmdVel);
+    
+        // small sleep to prevent CPU overload
+	    ros::Duration(0.05).sleep();
+    }
 
-
-
-	/* The desired angle to close */
-	double alpha = beta;
-	/* Time to reach the desired position */
-	double time = 5.0;
-
-	geometry_msgs::Twist reOrientCmdVel;
-	reOrientCmdVel.angular.z = alpha / time * 0.75;
-
-
-	ROS_INFO("Decelerating in Approach...");
-	//reOrientCmdVel.angular.x = 0.0;
-	//reOrientCmdVel.angular.z = 0.0;
-	outCmdVelPub_.publish(reOrientCmdVel);
-	ros::Duration(time).sleep();
+    behaviorStateTextMsg_.data = "Finished Aligning";
+    stateTextPub_.publish(behaviorStateTextMsg_);
+	StopCmdVel.angular.x = 0.0;
+	StopCmdVel.angular.z = 0.0;
+	outCmdVelPub_.publish(StopCmdVel);
+	ros::Duration(4.0).sleep();
 	eventDict[HUMAN_SEEN] = true;
 
+    const constexpr double sweepDegTurnedTransitionThreshold = 0.1;
+    /* Transition to Sweep */
+	if (eventDict[HUMAN_SEEN] and not eventDict[USER_CONTROL] and sweepDegTurned_ > sweepDegTurnedTransitionThreshold) 
+        currentState = SWEEP_STATE;
 	/* Transition to explore */
-	if (eventDict[HUMAN_SEEN] and not eventDict[USER_CONTROL]) currentState = EXPLORE_STATE;
+	if (eventDict[HUMAN_SEEN] and not eventDict[USER_CONTROL] and sweepDegTurned_ <= sweepDegTurnedTransitionThreshold) 
+        currentState = EXPLORE_STATE;
 	 /* Transition to user input */
 	if (eventDict[HUMAN_SEEN] and eventDict[USER_CONTROL]) currentState = INPUT_STATE;
 	/* Transition to Idle */
@@ -190,27 +207,32 @@ BehavioralExecutive::runApproach()
 void
 BehavioralExecutive::runSweep()
 {
-	std::cout << "\rCurrent State: Sweep  " << sweepDegTurned_ * 180 / M_PI << "deg" << std::flush;
+	// std::cout << "\rCurrent State: Sweep  " << sweepDegTurned_ * 180 / M_PI << "deg" << std::flush;
+    std::stringstream stream;
+    stream << std::fixed << std::setprecision(1) << sweepDegTurned_ * 180 / M_PI;
+    behaviorStateTextMsg_.data = "Sweep " + stream.str() + " deg";
+    stateTextPub_.publish(behaviorStateTextMsg_);
 	/* Reset events */
 	resetEvents({GOAL_REACHED, HUMAN_SEEN});
 
 	geometry_msgs::Twist sweepCmdVel;
 
-        if (!finishedSweepSleep_)
-        {
-	  		ROS_INFO("Decelerating to Sweep...");
-        	sweepCmdVel.angular.x = 0.0;
-        	sweepCmdVel.angular.z = 0.0;
-        	outCmdVelPub_.publish(sweepCmdVel);
-        	ros::Duration(5.0).sleep();
-        }
+    if (!finishedSweepSleep_)
+    {
+        behaviorStateTextMsg_.data = "Decelerating to Sweep";
+        stateTextPub_.publish(behaviorStateTextMsg_);
+        sweepCmdVel.angular.x = 0.0;
+        sweepCmdVel.angular.z = 0.0;
+        outCmdVelPub_.publish(sweepCmdVel);
+        ros::Duration(5.0).sleep();
+    }
 
 	sweepCmdVel.angular.z = sweepSpeed_;
 
 	// publish sweep cmd vel when running sweep
 	outCmdVelPub_.publish(sweepCmdVel);
 
-	if (sweepDegTurned_ > 2 * M_PI)
+	if (sweepDegTurned_ > sweepDegTarget_)
 	{
 		sweepDegTurned_ = 0.0;
 		eventDict[NO_HUMAN] = true;
@@ -225,7 +247,7 @@ BehavioralExecutive::runSweep()
 	/* Transition to Idle */
 	if (eventDict[STOP]) currentState = IDLE_STATE;
 
-        finishedSweepSleep_ = true;
+    finishedSweepSleep_ = true;
 }
 
 namespace {
@@ -383,8 +405,19 @@ BehavioralExecutive::commandsCallback(const dragoon_messages::stateCmdConstPtr s
 
 void BehavioralExecutive::imuCallback(const sensor_msgs::Imu::ConstPtr& msg)
 {
-	ros::Duration dt = ros::Time::now() - lastImuTime_;
-	sweepDegTurned_ += msg->angular_velocity.z * dt.toSec();
+    // if not in sweep, skip this
+    if (currentState == SWEEP_STATE)
+    {
+        // Calculate degress turned from imu
+        ros::Duration dt = ros::Time::now() - lastImuTime_;
+        if (dt.toSec() > 0.2)
+        {
+            ROS_WARN("IMU in executive is too old");
+        } else
+        {
+            sweepDegTurned_ += msg->angular_velocity.z * dt.toSec();
+        }
+    }
 	lastImuTime_ = ros::Time::now();
 }
 
@@ -396,19 +429,22 @@ void BehavioralExecutive::moveBaseCmdVelCallback(const geometry_msgs::Twist::Con
 void
 BehavioralExecutive::initRos()
 {
-	/* TODO: Fill in the human detection */
 	humanStatesSub_ = nodeHandle_.subscribe("/world_state", 1, &BehavioralExecutive::humanDetectionCallback, this);
 	humanEvidencesSub_ = nodeHandle_.subscribe("/world_evidence", 1, &BehavioralExecutive::humanEvidenceCallback, this);
 	commandsSub_ = nodeHandle_.subscribe("commands", 1, &BehavioralExecutive::commandsCallback, this);
-	/* TODO: subscirbe to the current pose from TF or something */
-	// poseSub_ = nodeHandle_.subscribe("")
 	// run the node at specific frequency
 	privateNodeHandle_.param<double>("timer_freq_", timer_freq_, 20);
 	privateNodeHandle_.param<double>("sweep_speed", sweepSpeed_, 0.3);
 	privateNodeHandle_.param<double>("evidence_threshold", evidenceThreshold_, 1.0);
+	privateNodeHandle_.param<double>("sweep_deg_target", sweepDegTarget_, M_PI * 2);
+	privateNodeHandle_.param<double>("time_aligning_limit", timeAligningLimit_, 5.0);
+	privateNodeHandle_.param<double>("aligning_closeness_threshold", reOrientClosenessThreshold_, 0.2);
+	privateNodeHandle_.param<double>("aligning_p_gain", reOrientPGain_, 0.5);
+
 	timer_ = nodeHandle_.createTimer(ros::Rate(timer_freq_), &BehavioralExecutive::timerCallback, this);
 	/* Publishers */
 	statePub_ = nodeHandle_.advertise<std_msgs::Int32>("/behavior_state", 1);
+    stateTextPub_ = nodeHandle_.advertise<std_msgs::String>("/behavior_state_text", 1);
 
 	// Sweep related
 	imuSub_ = nodeHandle_.subscribe("imu", 1, &BehavioralExecutive::imuCallback, this);
