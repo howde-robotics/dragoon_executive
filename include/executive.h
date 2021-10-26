@@ -5,6 +5,7 @@
 #include "states.h"
 #include "dragoon_messages/stateCmd.h"
 #include <std_msgs/Int32.h>
+#include <std_msgs/String.h>
 #include <actionlib/server/simple_action_server.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/Point.h>
@@ -28,7 +29,7 @@ class BehavioralExecutive {
 	actionlib::SimpleActionServer<move_base_msgs::MoveBaseAction> moveBaseClient_;
 	ros::NodeHandle nodeHandle_, privateNodeHandle_;
 	ros::Subscriber humanStatesSub_, humanEvidencesSub_, commandsSub_, poseSub_;
-	ros::Publisher commandsPub_, statePub_, humanEvidencePoseInBaseLinkPub_;
+	ros::Publisher commandsPub_, statePub_, humanEvidencePoseInBaseLinkPub_, stateTextPub_;
 	ros::Timer timer_;
 	/* Detection related */
 	tf2_ros::Buffer tfBuffer;
@@ -36,18 +37,25 @@ class BehavioralExecutive {
 	geometry_msgs::TransformStamped dragoonTransform_;
 	geometry_msgs::PoseStamped humanEvidencePose_, humanEvidencePoseInBaseLink_, humanPose_;
 	double evidenceThreshold_;
+    std_msgs::String behaviorStateTextMsg_;
 	std::unordered_map<int, geometry_msgs::PoseStamped> detectedHumans_;
+
+    // Approach related
+    double timeAligningLimit_ = 5.0; // sec
+    double reOrientClosenessThreshold_ = 0.2; // rad
+    double reOrientPGain_ = 0.5; // P gain
 
 	// Sweep related
 	ros::Subscriber imuSub_, moveBaseCmdVelSub_;
 	ros::Publisher outCmdVelPub_;
 	double sweepSpeed_;	// rad/s
 	double sweepDegTurned_ = 0.0;
+    double sweepDegTarget_ = M_PI * 2;
 	ros::Time lastImuTime_;
 	geometry_msgs::Twist currMoveBaseCmdVel_;
 	void imuCallback(const sensor_msgs::Imu::ConstPtr& msg);
 	void moveBaseCmdVelCallback(const geometry_msgs::Twist::ConstPtr& msg);
-        bool finishedSweepSleep_ = false;
+    bool finishedSweepSleep_ = false;
 
 	void initRos();
 	void run();
