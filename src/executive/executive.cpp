@@ -135,7 +135,7 @@ BehavioralExecutive::runApproach()
 	StopCmdVel.angular.x = 0.0;
 	StopCmdVel.angular.z = 0.0;
 	outCmdVelPub_.publish(StopCmdVel);
-	ros::Duration(4.0).sleep();
+	ros::Duration(2.0).sleep();
 
     // Trying to align
     behaviorStateTextMsg_.data = "Aligning to detected human";
@@ -188,7 +188,7 @@ BehavioralExecutive::runApproach()
 	StopCmdVel.angular.x = 0.0;
 	StopCmdVel.angular.z = 0.0;
 	outCmdVelPub_.publish(StopCmdVel);
-	ros::Duration(4.0).sleep();
+	ros::Duration(2.0).sleep();
 	eventDict[HUMAN_SEEN] = true;
 
     const constexpr double sweepDegTurnedTransitionThreshold = 0.1;
@@ -224,7 +224,7 @@ BehavioralExecutive::runSweep()
         sweepCmdVel.angular.x = 0.0;
         sweepCmdVel.angular.z = 0.0;
         outCmdVelPub_.publish(sweepCmdVel);
-        ros::Duration(5.0).sleep();
+        ros::Duration(2.0).sleep();
     }
 
 	sweepCmdVel.angular.z = sweepSpeed_;
