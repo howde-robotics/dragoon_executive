@@ -5,8 +5,8 @@ BehavioralExecutive::BehavioralExecutive() : privateNodeHandle_("~"), moveBaseCl
 	this->initRos();
 
 	// To ensure that tfBuffer has a frame to look at even before any detection exist;
-	humanEvidencePose_.header.frame_id = "map";
-	humanEvidencePoseInBaseLink_.header.frame_id = "base_link";
+	humanEvidencePose_.header.frame_id = mapFrameName_;
+	humanEvidencePoseInBaseLink_.header.frame_id = robotFrameName_;
 }
 
 void
@@ -84,8 +84,9 @@ BehavioralExecutive::runExplore()
 	if (eventDict[GOAL_REACHED])
 	{
 		finishedSweepSleep_ = false;
-                currentState = SWEEP_STATE;
+        currentState = SWEEP_STATE;
 		sweepDegTurned_ = 0.0;
+        isSweeping_ = true;
 	}
 	/* Transition to Approach human */
 	if (eventDict[NEW_HUMAN]) currentState = APPROACH_STATE;
@@ -153,7 +154,7 @@ BehavioralExecutive::runApproach()
         /* Listen for dragoon's current pose */
         try {
             /* TODO: Put in correct things here */
-            dragoonTransform_ = tfBuffer.lookupTransform("base_link", "map", ros::Time(0));
+            dragoonTransform_ = tfBuffer.lookupTransform(robotFrameName_, mapFrameName_, ros::Time(0));
         }
         catch (tf2::TransformException& ex){
             ROS_WARN("%s", ex.what());
@@ -191,12 +192,11 @@ BehavioralExecutive::runApproach()
 	ros::Duration(2.0).sleep();
 	eventDict[HUMAN_SEEN] = true;
 
-    const constexpr double sweepDegTurnedTransitionThreshold = 0.1;
     /* Transition to Sweep */
-	if (eventDict[HUMAN_SEEN] and not eventDict[USER_CONTROL] and sweepDegTurned_ > sweepDegTurnedTransitionThreshold) 
+	if (eventDict[HUMAN_SEEN] and not eventDict[USER_CONTROL] and isSweeping_) 
         currentState = SWEEP_STATE;
 	/* Transition to explore */
-	if (eventDict[HUMAN_SEEN] and not eventDict[USER_CONTROL] and sweepDegTurned_ <= sweepDegTurnedTransitionThreshold) 
+	if (eventDict[HUMAN_SEEN] and not eventDict[USER_CONTROL] and not isSweeping_) 
         currentState = EXPLORE_STATE;
 	 /* Transition to user input */
 	if (eventDict[HUMAN_SEEN] and eventDict[USER_CONTROL]) currentState = INPUT_STATE;
@@ -235,6 +235,7 @@ BehavioralExecutive::runSweep()
 	if (sweepDegTurned_ > sweepDegTarget_)
 	{
 		sweepDegTurned_ = 0.0;
+        isSweeping_ = false;
 		eventDict[NO_HUMAN] = true;
 	}
 
@@ -295,7 +296,7 @@ BehavioralExecutive::humanDetectionCallback(const wire_msgs::WorldState::ConstPt
 				if (gauss) {
 					const pbl::Vector& mean = gauss->getMean();
 					humanPose_.header.stamp = msg->header.stamp;
-					humanPose_.header.frame_id = "map";
+					humanPose_.header.frame_id = mapFrameName_;
 					humanPose_.pose.position.x = mean(0);
 					humanPose_.pose.position.y = mean(1);
 					humanPose_.pose.position.z = mean(2);
@@ -339,7 +340,7 @@ BehavioralExecutive::humanEvidenceCallback(const wire_msgs::WorldEvidence::Const
 				if (gauss) {
 					const pbl::Vector& mean = gauss->getMean();
 					humanEvidencePose_.header.stamp = msg->header.stamp;
-					humanEvidencePose_.header.frame_id = "map";
+					humanEvidencePose_.header.frame_id = mapFrameName_;
 					humanEvidencePose_.pose.position.x = mean(0);
 					humanEvidencePose_.pose.position.y = mean(1);
 					humanEvidencePose_.pose.position.z = mean(2);
@@ -405,8 +406,8 @@ BehavioralExecutive::commandsCallback(const dragoon_messages::stateCmdConstPtr s
 
 void BehavioralExecutive::imuCallback(const sensor_msgs::Imu::ConstPtr& msg)
 {
-    // if not in sweep, skip this
-    if (currentState == SWEEP_STATE)
+    // if not in sweep or approach, skip this
+    if (currentState == SWEEP_STATE or currentState == APPROACH_STATE)
     {
         // Calculate degress turned from imu
         ros::Duration dt = ros::Time::now() - lastImuTime_;
@@ -440,6 +441,8 @@ BehavioralExecutive::initRos()
 	privateNodeHandle_.param<double>("time_aligning_limit", timeAligningLimit_, 5.0);
 	privateNodeHandle_.param<double>("aligning_closeness_threshold", reOrientClosenessThreshold_, 0.2);
 	privateNodeHandle_.param<double>("aligning_p_gain", reOrientPGain_, 0.5);
+	privateNodeHandle_.param("map_frame_name", mapFrameName_, std::string("map"));
+	privateNodeHandle_.param("robot_frame_name", robotFrameName_, std::string("base_link"));
 
 	timer_ = nodeHandle_.createTimer(ros::Rate(timer_freq_), &BehavioralExecutive::timerCallback, this);
 	/* Publishers */

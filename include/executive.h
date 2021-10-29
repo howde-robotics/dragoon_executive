@@ -39,6 +39,8 @@ class BehavioralExecutive {
 	double evidenceThreshold_;
     std_msgs::String behaviorStateTextMsg_;
 	std::unordered_map<int, geometry_msgs::PoseStamped> detectedHumans_;
+    std::string mapFrameName_ = "map";
+    std::string robotFrameName_ = "base_link";
 
     // Approach related
     double timeAligningLimit_ = 5.0; // sec
@@ -48,6 +50,7 @@ class BehavioralExecutive {
 	// Sweep related
 	ros::Subscriber imuSub_, moveBaseCmdVelSub_;
 	ros::Publisher outCmdVelPub_;
+    bool isSweeping_ = false;
 	double sweepSpeed_;	// rad/s
 	double sweepDegTurned_ = 0.0;
     double sweepDegTarget_ = M_PI * 2;
