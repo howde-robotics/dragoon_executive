@@ -11,6 +11,7 @@ const std::string OLD_HUMAN    = "OLD HUMAN";
 const std::string NO_HUMAN     = "NO HUMAN";
 const std::string GOAL_REACHED = "GOAL REACHED";
 const std::string HUMAN_SEEN   = "HUMAN SEEN";
+const std::string CONCLUDE_SWEEP = "CONCLUDE SWEEP";
 
 std::unordered_map<std::string, bool> eventDict = {
 	{STOP           , false}  ,
@@ -21,6 +22,7 @@ std::unordered_map<std::string, bool> eventDict = {
 	{NO_HUMAN       , false}  ,
 	{GOAL_REACHED   , false}  ,
 	{HUMAN_SEEN  , false}  ,
+	{CONCLUDE_SWEEP, false},
 };
 
 enum State {
