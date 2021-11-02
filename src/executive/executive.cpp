@@ -255,6 +255,14 @@ BehavioralExecutive::runSweep()
     /* Transition to Idle */
     if (eventDict[STOP]) currentState = IDLE_STATE;
 
+	/* Perform the concluding switch to idle */
+	if (eventDict[NO_HUMAN] and eventDict[CONCLUDE_SWEEP]) {
+		/* Reset the concluding event */
+		resetEvents(CONCLUDE_SWEEP);
+		/* Go to IDLE */
+		currentState = IDLE_STATE;
+	}
+
     finishedSweepSleep_ = true;
 }
 
