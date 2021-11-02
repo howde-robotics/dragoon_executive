@@ -48,6 +48,7 @@ BehavioralExecutive::run()
     {	
         stateMsg.data = currentState;
         statePub_.publish(stateMsg);
+		ROS_INFO_STREAM("Changed state from " << stateWords[oldState] << ", to " << stateWords[currentState] << std::endl);
     }
 }
 

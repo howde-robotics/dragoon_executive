@@ -33,6 +33,14 @@ enum State {
 	SWEEP_STATE,
 };
 
+std::unordered_map<State, std::string> stateWords = {
+	{IDLE_STATE     , "IDLE"}     ,
+	{EXPLORE_STATE  , "EXPLORE"}  ,
+	{INPUT_STATE    , "INPUT"}    ,
+	{APPROACH_STATE , "APPROACH"} ,
+	{SWEEP_STATE    , "SWEEP"}
+};
+
 void
 resetEvents(const std::string event, bool value = false)
 {
