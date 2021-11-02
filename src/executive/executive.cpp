@@ -48,6 +48,7 @@ BehavioralExecutive::run()
     {	
         stateMsg.data = currentState;
         statePub_.publish(stateMsg);
+		ROS_INFO_STREAM("Changed state from " << stateWords[oldState] << ", to " << stateWords[currentState] << std::endl);
     }
 }
 
@@ -243,7 +244,7 @@ BehavioralExecutive::runSweep()
     }
 
     /* Transition to Explore */
-    if (eventDict[NO_HUMAN] and not eventDict[USER_CONTROL])
+    if (eventDict[NO_HUMAN] and not eventDict[USER_CONTROL] and not eventDict[CONCLUDE_SWEEP])
     {
         ros::Duration(2.0).sleep();
         currentState = EXPLORE_STATE;
@@ -254,6 +255,15 @@ BehavioralExecutive::runSweep()
     if (eventDict[NEW_HUMAN]) currentState = APPROACH_STATE;
     /* Transition to Idle */
     if (eventDict[STOP]) currentState = IDLE_STATE;
+
+	/* Perform the concluding switch to idle */
+	if (eventDict[NO_HUMAN] and eventDict[CONCLUDE_SWEEP]) {
+		/* Reset the concluding event */
+		resetEvents(CONCLUDE_SWEEP);
+		/* Go to IDLE */
+        ros::Duration(2.0).sleep();
+		currentState = IDLE_STATE;
+	}
 
     finishedSweepSleep_ = true;
 }
