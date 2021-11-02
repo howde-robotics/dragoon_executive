@@ -244,7 +244,7 @@ BehavioralExecutive::runSweep()
     }
 
     /* Transition to Explore */
-    if (eventDict[NO_HUMAN] and not eventDict[USER_CONTROL])
+    if (eventDict[NO_HUMAN] and not eventDict[USER_CONTROL] and not eventDict[CONCLUDE_SWEEP])
     {
         ros::Duration(2.0).sleep();
         currentState = EXPLORE_STATE;
@@ -261,6 +261,7 @@ BehavioralExecutive::runSweep()
 		/* Reset the concluding event */
 		resetEvents(CONCLUDE_SWEEP);
 		/* Go to IDLE */
+        ros::Duration(2.0).sleep();
 		currentState = IDLE_STATE;
 	}
 
