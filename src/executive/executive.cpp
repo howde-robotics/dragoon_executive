@@ -93,6 +93,8 @@ BehavioralExecutive::runExplore()
     if (eventDict[NEW_HUMAN]) currentState = APPROACH_STATE;
      /* Transition to IDLE */
     if (eventDict[STOP]) currentState = IDLE_STATE;
+    /* Transition to sweep */
+    if (eventDict[CONCLUDE_SWEEP]) currentState = SWEEP_STATE;
 }
 
 void 
@@ -243,8 +245,18 @@ BehavioralExecutive::runSweep()
         eventDict[NO_HUMAN] = true;
     }
 
+    finishedSweepSleep_ = true;
+	/* Perform the concluding switch to idle */
+	if (eventDict[NO_HUMAN] and eventDict[CONCLUDE_SWEEP]) {
+		/* Reset the concluding event */
+		resetEvents(CONCLUDE_SWEEP);
+		/* Go to IDLE */
+        ros::Duration(2.0).sleep();
+		currentState = IDLE_STATE;
+        return;
+	}
     /* Transition to Explore */
-    if (eventDict[NO_HUMAN] and not eventDict[USER_CONTROL] and not eventDict[CONCLUDE_SWEEP])
+    if (eventDict[NO_HUMAN] and not eventDict[USER_CONTROL])
     {
         ros::Duration(2.0).sleep();
         currentState = EXPLORE_STATE;
@@ -255,17 +267,6 @@ BehavioralExecutive::runSweep()
     if (eventDict[NEW_HUMAN]) currentState = APPROACH_STATE;
     /* Transition to Idle */
     if (eventDict[STOP]) currentState = IDLE_STATE;
-
-	/* Perform the concluding switch to idle */
-	if (eventDict[NO_HUMAN] and eventDict[CONCLUDE_SWEEP]) {
-		/* Reset the concluding event */
-		resetEvents(CONCLUDE_SWEEP);
-		/* Go to IDLE */
-        ros::Duration(2.0).sleep();
-		currentState = IDLE_STATE;
-	}
-
-    finishedSweepSleep_ = true;
 }
 
 namespace {
