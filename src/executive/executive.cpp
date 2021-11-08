@@ -139,7 +139,7 @@ BehavioralExecutive::runApproach()
     StopCmdVel.angular.x = 0.0;
     StopCmdVel.angular.z = 0.0;
     outCmdVelPub_.publish(StopCmdVel);
-    ros::Duration(2.0).sleep();
+    ros::Duration(1.0).sleep();
 
     // Trying to align
     behaviorStateTextMsg_.data = "Aligning to detected human";
@@ -193,7 +193,7 @@ BehavioralExecutive::runApproach()
     StopCmdVel.angular.x = 0.0;
     StopCmdVel.angular.z = 0.0;
     outCmdVelPub_.publish(StopCmdVel);
-    ros::Duration(2.0).sleep();
+    ros::Duration(0.5).sleep();
     eventDict[HUMAN_SEEN] = true;
 
     /* Transition to Sweep */
@@ -230,7 +230,7 @@ BehavioralExecutive::runSweep()
         sweepCmdVel.angular.x = 0.0;
         sweepCmdVel.angular.z = 0.0;
         outCmdVelPub_.publish(sweepCmdVel);
-        ros::Duration(2.0).sleep();
+        ros::Duration(1.5).sleep();
     }
 
     sweepCmdVel.angular.z = sweepSpeed_;
@@ -250,15 +250,13 @@ BehavioralExecutive::runSweep()
 	if (eventDict[NO_HUMAN] and eventDict[CONCLUDE_SWEEP]) {
 		/* Reset the concluding event */
 		resetEvents(CONCLUDE_SWEEP);
-		/* Go to IDLE */
-        ros::Duration(2.0).sleep();
 		currentState = IDLE_STATE;
         return;
 	}
     /* Transition to Explore */
     if (eventDict[NO_HUMAN] and not eventDict[USER_CONTROL])
     {
-        ros::Duration(2.0).sleep();
+        ros::Duration(1.0).sleep();
         currentState = EXPLORE_STATE;
     }
     /* Transition to input */
